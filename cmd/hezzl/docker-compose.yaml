@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  # Service with application container
+  hezzl-backend:
+    image: hezzl/web-backend
+    depends_on:
+      postgres-database:
+        condition: service_healthy
+      redis-database:
+        condition: service_started
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=admin
+    ports:
+      - "8000:8000"
+
+  # Service with postgres database container
+  postgres-database:
+    image: postgres:latest
+    volumes:
+      - postgres-database:/data/db/postgres
+    environment:
+      - POSTGRES_DB=hezzl_service
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=admin
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Service for managing postgres migrations
+  postgres-migrations:
+    image: migrate/migrate
+    depends_on:
+      postgres-database:
+        condition: service_healthy
+    volumes:
+      - ../../migrations:/data/db/postgres/migrations
+    command:
+      [ "-path", "/data/db/postgres/migrations", "-database", "postgres://postgres:admin@postgres-database:5432/hezzl_service?sslmode=disable", "up" ]
+
+  # Service with redis database container
+  redis-database:
+    image: redis:latest
+    volumes:
+      - redis-database:/data/db/redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres-database:
+  redis-database:

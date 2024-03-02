@@ -1,0 +1,15 @@
+app:
+  http:
+    server:
+      host: 0.0.0.0
+      port: 8000
+
+  postgres:
+    host: postgres-database
+    port: 5432
+    database: hezzl_service
+
+  redis:
+    host: redis-database
+    port: 6379
+    database: 0
