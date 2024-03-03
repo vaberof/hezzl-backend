@@ -9,7 +9,7 @@ type Good struct {
 	ProjectId   domain.ProjectId
 	Name        domain.GoodName
 	Description domain.GoodDescription
-	Priority    domain.ProjectId
+	Priority    domain.GoodPriority
 	Removed     domain.GoodRemoved
 	CreatedAt   domain.GoodCreatedAt
 }

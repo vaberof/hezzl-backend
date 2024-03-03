@@ -26,10 +26,10 @@ var (
 
 type GoodService interface {
 	Create(projectId domain.ProjectId, name domain.GoodName) (*Good, error)
-	Update(id domain.GoodId, projectId domain.ProjectId, name domain.GoodName, description domain.GoodDescription) (*Good, error)
+	Update(id domain.GoodId, projectId domain.ProjectId, name domain.GoodName, description *domain.GoodDescription) (*Good, error)
 	Delete(id domain.GoodId, projectId domain.ProjectId) error
 	List(limit, offset int) ([]*Good, error)
-	ChangePriority(id domain.GoodId, projectId domain.ProjectId) ([]*Good, error)
+	ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority int) ([]*Good, error)
 }
 
 type goodServiceImpl struct {
@@ -44,10 +44,10 @@ func NewGoodService(goodStorage GoodStorage, inMemoryStorage InMemoryStorage) Go
 	}
 }
 
-func (gs *goodServiceImpl) Create(projectId domain.ProjectId, name domain.GoodName) (*Good, error) {
+func (g *goodServiceImpl) Create(projectId domain.ProjectId, name domain.GoodName) (*Good, error) {
 	// log to clickhouse
 
-	domainGood, err := gs.goodStorage.Create(projectId, name)
+	domainGood, err := g.goodStorage.Create(projectId, name)
 	if err != nil {
 		return nil, err
 	}
@@ -55,10 +55,10 @@ func (gs *goodServiceImpl) Create(projectId domain.ProjectId, name domain.GoodNa
 	return domainGood, nil
 }
 
-func (gs *goodServiceImpl) Update(id domain.GoodId, projectId domain.ProjectId, name domain.GoodName, description domain.GoodDescription) (*Good, error) {
+func (g *goodServiceImpl) Update(id domain.GoodId, projectId domain.ProjectId, name domain.GoodName, description *domain.GoodDescription) (*Good, error) {
 	// log to clickhouse
 
-	exists, err := gs.goodStorage.IsExists(id, projectId)
+	exists, err := g.goodStorage.IsExists(id, projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -66,14 +66,14 @@ func (gs *goodServiceImpl) Update(id domain.GoodId, projectId domain.ProjectId, 
 		return nil, ErrGoodNotFound
 	}
 
-	domainGood, err := gs.Update(id, projectId, name, description)
+	domainGood, err := g.goodStorage.Update(id, projectId, name, description)
 	if err != nil {
 		return nil, err
 	}
 
-	goodCacheKey := gs.getGoodCacheKey(id, projectId)
+	goodCacheKey := g.getGoodCacheKey(id, projectId)
 
-	err = gs.inMemoryStorage.Delete(goodCacheKey)
+	err = g.inMemoryStorage.Delete(goodCacheKey)
 	if err != nil {
 		if !errors.Is(err, storage.ErrRedisKeyNotFound) {
 			return nil, err
@@ -83,17 +83,17 @@ func (gs *goodServiceImpl) Update(id domain.GoodId, projectId domain.ProjectId, 
 	return domainGood, nil
 }
 
-func (gs *goodServiceImpl) Delete(id domain.GoodId, projectId domain.ProjectId) error {
+func (g *goodServiceImpl) Delete(id domain.GoodId, projectId domain.ProjectId) error {
 	// log to clickhouse
 
-	err := gs.goodStorage.Delete(id, projectId)
+	err := g.goodStorage.Delete(id, projectId)
 	if err != nil {
 		return err
 	}
 
-	goodCacheKey := gs.getGoodCacheKey(id, projectId)
+	goodCacheKey := g.getGoodCacheKey(id, projectId)
 
-	err = gs.inMemoryStorage.Delete(goodCacheKey)
+	err = g.inMemoryStorage.Delete(goodCacheKey)
 	if err != nil {
 		if !errors.Is(err, storage.ErrRedisKeyNotFound) {
 			return err
@@ -103,12 +103,12 @@ func (gs *goodServiceImpl) Delete(id domain.GoodId, projectId domain.ProjectId) 
 	return nil
 }
 
-func (gs *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
+func (g *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
 	// log to clickhouse
 
-	goodListCacheKey := gs.getGoodListCacheKey(limit, offset)
+	goodListCacheKey := g.getGoodListCacheKey(limit, offset)
 
-	cachedDomainGoods, err := gs.getCachedGoods(goodListCacheKey)
+	cachedDomainGoods, err := g.getCachedGoods(goodListCacheKey)
 	if err == nil {
 		return cachedDomainGoods, nil
 	}
@@ -118,7 +118,7 @@ func (gs *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
 		}
 	}
 
-	domainGoods, err := gs.goodStorage.List(limit, offset)
+	domainGoods, err := g.goodStorage.List(limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (gs *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
 		return nil, err
 	}
 
-	err = gs.inMemoryStorage.Set(goodListCacheKey, string(domainGoodsBytes), goodListCacheExpireTime)
+	err = g.inMemoryStorage.Set(goodListCacheKey, string(domainGoodsBytes), goodListCacheExpireTime)
 	if err != nil {
 		return nil, err
 	}
@@ -136,10 +136,10 @@ func (gs *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
 	return domainGoods, nil
 }
 
-func (gs *goodServiceImpl) ChangePriority(id domain.GoodId, projectId domain.ProjectId) ([]*Good, error) {
+func (g *goodServiceImpl) ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority int) ([]*Good, error) {
 	// log to clickhouse
 
-	exists, err := gs.goodStorage.IsExists(id, projectId)
+	exists, err := g.goodStorage.IsExists(id, projectId)
 	if err != nil {
 		return nil, err
 	}
@@ -147,14 +147,14 @@ func (gs *goodServiceImpl) ChangePriority(id domain.GoodId, projectId domain.Pro
 		return nil, ErrGoodNotFound
 	}
 
-	domainGoods, err := gs.goodStorage.ChangePriority(id, projectId)
+	domainGoods, err := g.goodStorage.ChangePriority(id, projectId, newPriority)
 	if err != nil {
 		return nil, err
 	}
 
-	goodCacheKeys := gs.getGoodCacheKeys(domainGoods)
+	goodCacheKeys := g.getGoodCacheKeys(domainGoods)
 
-	err = gs.inMemoryStorage.Delete(goodCacheKeys...)
+	err = g.inMemoryStorage.Delete(goodCacheKeys...)
 	if !errors.Is(err, storage.ErrRedisKeyNotFound) {
 		return nil, err
 	}
@@ -162,8 +162,8 @@ func (gs *goodServiceImpl) ChangePriority(id domain.GoodId, projectId domain.Pro
 	return domainGoods, nil
 }
 
-func (gs *goodServiceImpl) getCachedGoods(key string) ([]*Good, error) {
-	cachedGoodsStr, err := gs.inMemoryStorage.Get(key)
+func (g *goodServiceImpl) getCachedGoods(key string) ([]*Good, error) {
+	cachedGoodsStr, err := g.inMemoryStorage.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -178,22 +178,22 @@ func (gs *goodServiceImpl) getCachedGoods(key string) ([]*Good, error) {
 	return domainGoods, nil
 }
 
-func (gs *goodServiceImpl) getGoodCacheKeys(domainGoods []*Good) []string {
+func (g *goodServiceImpl) getGoodCacheKeys(domainGoods []*Good) []string {
 	goodCacheKeys := make([]string, len(domainGoods))
 	for i := range domainGoods {
-		goodCacheKeys[i] = gs.getGoodCacheKey(domainGoods[i].Id, domainGoods[i].ProjectId)
+		goodCacheKeys[i] = g.getGoodCacheKey(domainGoods[i].Id, domainGoods[i].ProjectId)
 	}
 	return goodCacheKeys
 }
 
-func (gs *goodServiceImpl) getGoodCacheKey(id domain.GoodId, projectId domain.ProjectId) string {
+func (g *goodServiceImpl) getGoodCacheKey(id domain.GoodId, projectId domain.ProjectId) string {
 	idStr := strconv.Itoa(int(id))
 	projectIdStr := strconv.Itoa(int(projectId))
 	goodCacheKey := goodKey + idStr + "_" + projectIdStr
 	return goodCacheKey
 }
 
-func (gs *goodServiceImpl) getGoodListCacheKey(limit, offset int) string {
+func (g *goodServiceImpl) getGoodListCacheKey(limit, offset int) string {
 	limitStr := strconv.Itoa(limit)
 	offsetStr := strconv.Itoa(offset)
 	goodListCacheKey := goodListKey + limitKey + limitStr + "_" + offsetKey + offsetStr
