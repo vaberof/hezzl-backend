@@ -13,7 +13,7 @@ var (
 )
 
 type Response struct {
-	Status  ResponseStatus  `json:"status"`
+	//Status  ResponseStatus  `json:"status"`
 	Payload json.RawMessage `json:"payload"`
 }
 
@@ -25,7 +25,7 @@ type ErrorResponsePayload struct {
 
 func Success(payload json.RawMessage) *Response {
 	return &Response{
-		Status:  ResponseStatus(statusOk),
+		//Status:  ResponseStatus(statusOk),
 		Payload: payload,
 	}
 }
@@ -38,7 +38,7 @@ func Error(code int, message string, details ErrorDescription) *Response {
 	})
 
 	return &Response{
-		Status:  ResponseStatus(statusError),
+		//Status:  ResponseStatus(statusError),
 		Payload: payload,
 	}
 }

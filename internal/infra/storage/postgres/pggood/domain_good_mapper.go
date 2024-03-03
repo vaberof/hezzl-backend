@@ -18,7 +18,7 @@ func toDomainGood(postgresGood *Good) *good.Good {
 		Id:          domain.GoodId(postgresGood.Id),
 		ProjectId:   domain.ProjectId(postgresGood.ProjectId),
 		Name:        domain.GoodName(postgresGood.Name),
-		Description: domain.GoodDescription(postgresGood.Description),
+		Description: domain.GoodDescription(postgresGood.Description.String),
 		Priority:    domain.GoodPriority(postgresGood.Priority),
 		Removed:     domain.GoodRemoved(postgresGood.Removed),
 		CreatedAt:   domain.GoodCreatedAt(postgresGood.CreatedAt),

@@ -27,9 +27,9 @@ var (
 type GoodService interface {
 	Create(projectId domain.ProjectId, name domain.GoodName) (*Good, error)
 	Update(id domain.GoodId, projectId domain.ProjectId, name domain.GoodName, description *domain.GoodDescription) (*Good, error)
-	Delete(id domain.GoodId, projectId domain.ProjectId) error
+	Delete(id domain.GoodId, projectId domain.ProjectId) (*Good, error)
 	List(limit, offset int) ([]*Good, error)
-	ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority int) ([]*Good, error)
+	ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority domain.GoodPriority) ([]*Good, error)
 }
 
 type goodServiceImpl struct {
@@ -83,12 +83,15 @@ func (g *goodServiceImpl) Update(id domain.GoodId, projectId domain.ProjectId, n
 	return domainGood, nil
 }
 
-func (g *goodServiceImpl) Delete(id domain.GoodId, projectId domain.ProjectId) error {
+func (g *goodServiceImpl) Delete(id domain.GoodId, projectId domain.ProjectId) (*Good, error) {
 	// log to clickhouse
 
-	err := g.goodStorage.Delete(id, projectId)
+	domainGood, err := g.goodStorage.Delete(id, projectId)
 	if err != nil {
-		return err
+		if errors.Is(err, storage.ErrPostgresGoodNotFound) {
+			return nil, ErrGoodNotFound
+		}
+		return nil, err
 	}
 
 	goodCacheKey := g.getGoodCacheKey(id, projectId)
@@ -96,11 +99,11 @@ func (g *goodServiceImpl) Delete(id domain.GoodId, projectId domain.ProjectId) e
 	err = g.inMemoryStorage.Delete(goodCacheKey)
 	if err != nil {
 		if !errors.Is(err, storage.ErrRedisKeyNotFound) {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return domainGood, nil
 }
 
 func (g *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
@@ -136,7 +139,7 @@ func (g *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
 	return domainGoods, nil
 }
 
-func (g *goodServiceImpl) ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority int) ([]*Good, error) {
+func (g *goodServiceImpl) ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority domain.GoodPriority) ([]*Good, error) {
 	// log to clickhouse
 
 	exists, err := g.goodStorage.IsExists(id, projectId)
@@ -155,8 +158,10 @@ func (g *goodServiceImpl) ChangePriority(id domain.GoodId, projectId domain.Proj
 	goodCacheKeys := g.getGoodCacheKeys(domainGoods)
 
 	err = g.inMemoryStorage.Delete(goodCacheKeys...)
-	if !errors.Is(err, storage.ErrRedisKeyNotFound) {
-		return nil, err
+	if err != nil {
+		if !errors.Is(err, storage.ErrRedisKeyNotFound) {
+			return nil, err
+		}
 	}
 
 	return domainGoods, nil

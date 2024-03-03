@@ -1,12 +1,12 @@
 CREATE TABLE IF NOT EXISTS goods
 (
     id          SERIAL PRIMARY KEY,
-    project_id  INT UNIQUE NOT NULL REFERENCES projects (id),
-    name        TEXT       NOT NULL,
+    project_id  INT  NOT NULL REFERENCES projects (id),
+    name        TEXT NOT NULL,
     description TEXT,
-    priority    INT        NOT NULL DEFAULT 1,
-    removed     BOOLEAN             DEFAULT FALSE,
-    created_at  TIMESTAMP           DEFAULT CURRENT_TIMESTAMP,
+    priority    INT  NOT NULL DEFAULT 1,
+    removed     BOOLEAN       DEFAULT FALSE,
+    created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT positive_priority CHECK (priority > 0)
 );
 CREATE INDEX IF NOT EXISTS project_id_idx ON goods (project_id);

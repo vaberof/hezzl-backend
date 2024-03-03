@@ -5,10 +5,12 @@ import (
 	"github.com/vaberof/hezzl-backend/pkg/config"
 	"github.com/vaberof/hezzl-backend/pkg/database/postgres"
 	"github.com/vaberof/hezzl-backend/pkg/database/redis"
+	"github.com/vaberof/hezzl-backend/pkg/http/httpserver"
 	"os"
 )
 
 type AppConfig struct {
+	Server   httpserver.ServerConfig
 	Postgres postgres.Config
 	Redis    redis.Config
 }
@@ -33,8 +35,14 @@ func tryGetAppConfig(sources ...string) (*AppConfig, error) {
 
 	provider := config.MergeConfigs(sources)
 
+	var serverConfig httpserver.ServerConfig
+	err := config.ParseConfig(provider, "app.http.server", &serverConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	var postgresConfig postgres.Config
-	err := config.ParseConfig(provider, "app.postgres", &postgresConfig)
+	err = config.ParseConfig(provider, "app.postgres", &postgresConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +56,7 @@ func tryGetAppConfig(sources ...string) (*AppConfig, error) {
 	}
 
 	appConfig := AppConfig{
+		Server:   serverConfig,
 		Postgres: postgresConfig,
 		Redis:    redisConfig,
 	}

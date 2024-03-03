@@ -21,10 +21,10 @@ DB_URL="postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(PO
 
 MIGRATIONS_PATH=migrations
 
-docker.run: docker.build
+docker.run.local: docker.build.local
 	docker compose -f cmd/hezzl/docker-compose.yaml up -d
 
-docker.build: build.linux
+docker.build.local: build.linux
 	docker build -t $(DOCKER_LOCAL_IMAGE_NAME) -f cmd/hezzl/Dockerfile .
 
 run.linux: build.linux

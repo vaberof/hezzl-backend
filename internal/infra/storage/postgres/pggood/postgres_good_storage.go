@@ -56,12 +56,11 @@ func (gs *PgGoodStorage) Update(id domain.GoodId, projectId domain.ProjectId, na
 	if err != nil {
 		return nil, err
 	}
+	defer tx.Rollback()
 
 	_, err = tx.Exec("LOCK TABLE goods IN SHARE ROW EXCLUSIVE MODE")
 	if err != nil {
-		if err = tx.Rollback(); err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	var postgresGood Good
@@ -69,10 +68,7 @@ func (gs *PgGoodStorage) Update(id domain.GoodId, projectId domain.ProjectId, na
 	query := `
 		UPDATE goods 
 		SET name=$1, 
-		    description=CASE 
-		        			WHEN $2 IS NOT NULL THEN $2
-							ELSE description
-						END
+		    description=COALESCE($2, description)
 		WHERE id=$3 AND project_id=$4
 		RETURNING 
 			    id, 
@@ -94,28 +90,70 @@ func (gs *PgGoodStorage) Update(id domain.GoodId, projectId domain.ProjectId, na
 		&postgresGood.Removed,
 		&postgresGood.CreatedAt,
 	); err != nil {
-		if err = tx.Rollback(); err != nil {
-			return nil, err
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrPostgresGoodNotFound
 		}
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
 	}
 
 	return toDomainGood(&postgresGood), nil
 }
 
-func (gs *PgGoodStorage) Delete(id domain.GoodId, projectId domain.ProjectId) error {
-	query := `
-		DELETE FROM goods WHERE id=$1 AND project_id=$2 
-	`
-	result, err := gs.db.Exec(query, id, projectId)
+func (gs *PgGoodStorage) Delete(id domain.GoodId, projectId domain.ProjectId) (*good.Good, error) {
+	tx, err := gs.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if count, _ := result.RowsAffected(); count == 0 {
-		return storage.ErrPostgresGoodNotFound
-	}
-	return nil
+	defer tx.Rollback()
 
+	_, err = tx.Exec("LOCK TABLE goods IN SHARE ROW EXCLUSIVE MODE")
+	if err != nil {
+		return nil, err
+	}
+
+	var postgresGood Good
+
+	query := `
+		UPDATE goods SET removed=TRUE 
+		             WHERE id=$1 AND project_id=$2
+		RETURNING 
+			    id, 
+			    project_id,
+			    name,
+			    description,
+			    priority,
+			    removed,
+			    created_at
+	`
+
+	row := tx.QueryRow(query, id, projectId)
+	err = row.Scan(
+		&postgresGood.Id,
+		&postgresGood.ProjectId,
+		&postgresGood.Name,
+		&postgresGood.Description,
+		&postgresGood.Priority,
+		&postgresGood.Removed,
+		&postgresGood.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, storage.ErrPostgresGoodNotFound
+		}
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return toDomainGood(&postgresGood), nil
 }
+
 func (gs *PgGoodStorage) List(limit, offset int) ([]*good.Good, error) {
 	limitOffsetParams := fmt.Sprintf(" LIMIT %d OFFSET %d ", limit, offset)
 
@@ -162,17 +200,16 @@ func (gs *PgGoodStorage) List(limit, offset int) ([]*good.Good, error) {
 	return toDomainGoods(postgresGoods), nil
 }
 
-func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority int) ([]*good.Good, error) {
+func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority domain.GoodPriority) ([]*good.Good, error) {
 	tx, err := gs.db.Begin()
 	if err != nil {
 		return nil, err
 	}
+	defer tx.Rollback()
 
 	_, err = tx.Exec("LOCK TABLE goods IN SHARE ROW EXCLUSIVE MODE")
 	if err != nil {
-		if err = tx.Rollback(); err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	query := `
@@ -190,9 +227,7 @@ func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.Proje
 
 	rows, err := tx.Query(query, newPriority, id, projectId)
 	if err != nil {
-		if err = tx.Rollback(); err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -211,12 +246,14 @@ func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.Proje
 			&postgresGood.CreatedAt,
 		)
 		if err != nil {
-			if err = tx.Rollback(); err != nil {
-				return nil, err
-			}
+			return nil, err
 		}
 
 		postgresGoods = append(postgresGoods, &postgresGood)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
 	}
 
 	return toDomainGoods(postgresGoods), nil
