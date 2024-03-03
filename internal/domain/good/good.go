@@ -2,15 +2,14 @@ package good
 
 import (
 	"github.com/vaberof/hezzl-backend/pkg/domain"
-	"time"
 )
 
 type Good struct {
-	Id          domain.GoodsId
+	Id          domain.GoodId
 	ProjectId   domain.ProjectId
-	Name        string
-	Description string
-	Priority    int
-	Removed     bool
-	CreatedAt   time.Time
+	Name        domain.GoodName
+	Description domain.GoodDescription
+	Priority    domain.ProjectId
+	Removed     domain.GoodRemoved
+	CreatedAt   domain.GoodCreatedAt
 }

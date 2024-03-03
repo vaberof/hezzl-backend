@@ -34,3 +34,14 @@ func (rs *RedisStorage) Get(key string) (string, error) {
 	}
 	return val, nil
 }
+
+func (rs *RedisStorage) Delete(key ...string) error {
+	_, err := rs.client.Del(context.Background(), key...).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return storage.ErrRedisKeyNotFound
+		}
+		return err
+	}
+	return nil
+}
