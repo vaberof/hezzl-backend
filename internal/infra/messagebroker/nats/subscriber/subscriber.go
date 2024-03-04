@@ -40,7 +40,7 @@ func (s *subscriberImpl) SubscribeOnGoodLogsSubject(goodLogStorage GoodLogStorag
 
 		goodLogs = append(goodLogs, &goodLog)
 
-		if len(goodLogs) == defaultBatchSize {
+		if len(goodLogs) >= defaultBatchSize {
 			err = goodLogStorage.Insert(buildCHGoodLogs(goodLogs))
 			if err != nil {
 				return

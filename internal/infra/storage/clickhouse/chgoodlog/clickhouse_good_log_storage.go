@@ -27,12 +27,12 @@ func (ch *ClickHouseGoodLogStorage) Insert(goodLogs []*GoodLog) error {
 	for i := range goodLogs {
 		err = batch.Append(
 			&goodLogs[i].Id,
-			goodLogs[i].ProjectId,
-			goodLogs[i].Name,
-			goodLogs[i].Description,
-			goodLogs[i].Priority,
-			goodLogs[i].Removed,
-			goodLogs[i].EventTime,
+			&goodLogs[i].ProjectId,
+			&goodLogs[i].Name,
+			&goodLogs[i].Description,
+			&goodLogs[i].Priority,
+			&goodLogs[i].Removed,
+			&goodLogs[i].EventTime,
 		)
 		if err != nil {
 			return err
