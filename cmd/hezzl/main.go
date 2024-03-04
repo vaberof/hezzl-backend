@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -15,6 +16,10 @@ import (
 	"github.com/vaberof/hezzl-backend/pkg/database/postgres"
 	"github.com/vaberof/hezzl-backend/pkg/database/redis"
 	"github.com/vaberof/hezzl-backend/pkg/http/httpserver"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 var appConfigPaths = flag.String("config.files", "not-found.yaml", "List of application config files separated by comma")
@@ -67,11 +72,43 @@ func main() {
 
 	appServer := httpserver.New(&appConfig.Server)
 
-	httpHandler.InitRoutes(appServer.Server)
+	httpHandler.InitRoutes(appServer.ChiRouter)
 
-	<-appServer.StartAsync()
+	serverExitChannel := appServer.StartAsync()
 
-	// TODO: implement graceful shutdown
+	quitCh := make(chan os.Signal, 1)
+	signal.Notify(quitCh, syscall.SIGTERM, syscall.SIGINT)
+
+	select {
+	case signalValue := <-quitCh:
+		log.Println("stopping application", "signal", signalValue.String())
+
+		gracefulShutdown(appServer, postgresManagedDb, redisManagedDb, clickHouseManagedDb)
+	case err := <-serverExitChannel:
+		log.Println("stopping application", "err", err.Error())
+
+		gracefulShutdown(appServer, postgresManagedDb, redisManagedDb, clickHouseManagedDb)
+	}
+}
+
+func gracefulShutdown(server *httpserver.AppServer, postgresManagedDb *postgres.ManagedDatabase, redisManagedDb *redis.ManagedDatabase, clickHouseManagedDb *clickhouse.ManagedDatabase) {
+	if err := server.Server.Shutdown(context.Background()); err != nil {
+		log.Printf("HTTP server Shutdown: %v\n", err)
+	}
+
+	if err := postgresManagedDb.Disconnect(); err != nil {
+		log.Printf("Postgres database Shutdown: %v\n", err)
+	}
+
+	if err := redisManagedDb.RedisDb.Close(); err != nil {
+		log.Printf("Redis database Shutdown: %v\n", err)
+	}
+
+	if err := clickHouseManagedDb.ClickHouseDb.Close(); err != nil {
+		log.Printf("ClickHouse database Shutdown: %v\n", err)
+	}
+
+	log.Println("Server successfully shutdown")
 }
 
 func loadEnvironmentVariables() error {

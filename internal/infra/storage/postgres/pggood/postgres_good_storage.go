@@ -9,6 +9,7 @@ import (
 	"github.com/vaberof/hezzl-backend/internal/infra/messagebroker/nats/publisher"
 	"github.com/vaberof/hezzl-backend/internal/infra/storage"
 	"github.com/vaberof/hezzl-backend/pkg/domain"
+	"log"
 )
 
 type PgGoodStorage struct {
@@ -49,7 +50,7 @@ func (gs *PgGoodStorage) Create(projectId domain.ProjectId, name domain.GoodName
 		&postgresGood.Removed,
 		&postgresGood.CreatedAt,
 	); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create good in database: %w", err)
 	}
 
 	if err := gs.goodLogPublisher.PublishGoodLog(
@@ -61,7 +62,7 @@ func (gs *PgGoodStorage) Create(projectId domain.ProjectId, name domain.GoodName
 		postgresGood.Removed,
 		postgresGood.CreatedAt,
 	); err != nil {
-		// TODO: process error
+		log.Println("Failed to publish good log:", err)
 	}
 
 	return toDomainGood(&postgresGood), nil
@@ -70,13 +71,13 @@ func (gs *PgGoodStorage) Create(projectId domain.ProjectId, name domain.GoodName
 func (gs *PgGoodStorage) Update(id domain.GoodId, projectId domain.ProjectId, name domain.GoodName, description *domain.GoodDescription) (*good.Good, error) {
 	tx, err := gs.db.Begin()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to start transaction while updating good: %w", err)
 	}
 	defer tx.Rollback()
 
 	_, err = tx.Exec("LOCK TABLE goods IN SHARE ROW EXCLUSIVE MODE")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to lock table while updating good: %w", err)
 	}
 
 	var postgresGood Good
@@ -107,13 +108,13 @@ func (gs *PgGoodStorage) Update(id domain.GoodId, projectId domain.ProjectId, na
 		&postgresGood.CreatedAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, storage.ErrPostgresGoodNotFound
+			return nil, fmt.Errorf("failed to update good in database: %w", storage.ErrPostgresGoodNotFound)
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to update good in database: %w", err)
 	}
 
 	if err = tx.Commit(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to commit transaction while updating good: %w", err)
 	}
 
 	if err = gs.goodLogPublisher.PublishGoodLog(
@@ -125,7 +126,7 @@ func (gs *PgGoodStorage) Update(id domain.GoodId, projectId domain.ProjectId, na
 		postgresGood.Removed,
 		postgresGood.CreatedAt,
 	); err != nil {
-		// TODO: process error
+		log.Println("Failed to publish good log:", err)
 	}
 
 	return toDomainGood(&postgresGood), nil
@@ -134,13 +135,13 @@ func (gs *PgGoodStorage) Update(id domain.GoodId, projectId domain.ProjectId, na
 func (gs *PgGoodStorage) Delete(id domain.GoodId, projectId domain.ProjectId) (*good.Good, error) {
 	tx, err := gs.db.Begin()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to start transaction while deleting good: %w", err)
 	}
 	defer tx.Rollback()
 
 	_, err = tx.Exec("LOCK TABLE goods IN SHARE ROW EXCLUSIVE MODE")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to lock table while deleting good: %w", err)
 	}
 
 	var postgresGood Good
@@ -170,13 +171,13 @@ func (gs *PgGoodStorage) Delete(id domain.GoodId, projectId domain.ProjectId) (*
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, storage.ErrPostgresGoodNotFound
+			return nil, fmt.Errorf("failed to delete good: %w", storage.ErrPostgresGoodNotFound)
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to delete good: %w", err)
 	}
 
 	if err = tx.Commit(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to commit transaction while deleting good: %w", err)
 	}
 
 	if err = gs.goodLogPublisher.PublishGoodLog(
@@ -188,7 +189,7 @@ func (gs *PgGoodStorage) Delete(id domain.GoodId, projectId domain.ProjectId) (*
 		postgresGood.Removed,
 		postgresGood.CreatedAt,
 	); err != nil {
-		// TODO: process error
+		log.Println("Failed to publish good log:", err)
 	}
 
 	return toDomainGood(&postgresGood), nil
@@ -198,21 +199,21 @@ func (gs *PgGoodStorage) List(limit, offset int) ([]*good.Good, error) {
 	limitOffsetParams := fmt.Sprintf(" LIMIT %d OFFSET %d ", limit, offset)
 
 	query := `
-		SELECT 
-			id, 
-			project_id,
-			name,
-			description,
-			priority,
-			removed,
-			created_at
-		FROM goods
-		ORDER BY id ASC
-		` + limitOffsetParams
+			SELECT 
+				id, 
+				project_id,
+				name,
+				description,
+				priority,
+				removed,
+				created_at
+			FROM goods
+			ORDER BY id
+			` + limitOffsetParams
 
 	rows, err := gs.db.Query(query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list goods: %w", err)
 	}
 	defer rows.Close()
 
@@ -231,7 +232,7 @@ func (gs *PgGoodStorage) List(limit, offset int) ([]*good.Good, error) {
 			&postgresGood.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to scan while listing goods: %w", err)
 		}
 
 		postgresGoods = append(postgresGoods, &postgresGood)
@@ -243,13 +244,13 @@ func (gs *PgGoodStorage) List(limit, offset int) ([]*good.Good, error) {
 func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority domain.GoodPriority) ([]*good.Good, error) {
 	tx, err := gs.db.Begin()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to start transaction while changing good priorities: %w", err)
 	}
 	defer tx.Rollback()
 
 	_, err = tx.Exec("LOCK TABLE goods IN SHARE ROW EXCLUSIVE MODE")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to lock table while changing good priorities: %w", err)
 	}
 
 	query := `
@@ -267,7 +268,7 @@ func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.Proje
 
 	rows, err := tx.Query(query, newPriority, id, projectId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to change good priorities: %w", err)
 	}
 	defer rows.Close()
 
@@ -286,14 +287,14 @@ func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.Proje
 			&postgresGood.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to scan changing good priorities: %w", err)
 		}
 
 		postgresGoods = append(postgresGoods, &postgresGood)
 	}
 
 	if err = tx.Commit(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to commit transaction while changing good priorities: %w", err)
 	}
 
 	go func() {
@@ -307,7 +308,7 @@ func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.Proje
 				postgresGood.Removed,
 				postgresGood.CreatedAt,
 			); err != nil {
-				// TODO: process error
+				log.Println("Failed to publish good log:", err)
 			}
 		}
 	}()
@@ -326,7 +327,7 @@ func (gs *PgGoodStorage) IsExists(id domain.GoodId, projectId domain.ProjectId) 
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("failed to check whether the good exists or not: %w", err)
 	}
 	return true, nil
 }

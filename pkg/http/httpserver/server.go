@@ -8,18 +8,22 @@ import (
 )
 
 type AppServer struct {
-	Server  *chi.Mux
-	config  *ServerConfig
-	address string
+	Server    *http.Server
+	ChiRouter *chi.Mux
+	config    *ServerConfig
 }
 
 func New(config *ServerConfig) *AppServer {
-	chiServer := chi.NewRouter()
+	chiRouter := chi.NewRouter()
+
+	httpServer := &http.Server{
+		Addr:    fmt.Sprintf("%s:%d", config.Host, config.Port),
+		Handler: chiRouter}
 
 	return &AppServer{
-		Server:  chiServer,
-		config:  config,
-		address: fmt.Sprintf("%s:%d", config.Host, config.Port),
+		Server:    httpServer,
+		ChiRouter: chiRouter,
+		config:    config,
 	}
 }
 
@@ -27,7 +31,7 @@ func (server *AppServer) StartAsync() <-chan error {
 	exitChannel := make(chan error)
 
 	go func() {
-		err := http.ListenAndServe(server.address, server.Server)
+		err := server.Server.ListenAndServe()
 		if !errors.Is(err, http.ErrServerClosed) {
 			exitChannel <- err
 			return

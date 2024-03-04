@@ -37,3 +37,7 @@ func New(config *Config) (*ManagedDatabase, error) {
 
 	return managedDatabase, nil
 }
+
+func (db *ManagedDatabase) Disconnect() error {
+	return db.ClickHouseDb.Close()
+}

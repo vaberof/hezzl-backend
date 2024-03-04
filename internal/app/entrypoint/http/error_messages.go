@@ -1,7 +1,7 @@
 package http
 
 var (
-	ErrMessageInvalidRequestBody  = "errors.invalidRequestBody"
+	ErrMessageInvalidRequestBody  = "errors.good.invalidRequestBody"
 	ErrMessageGoodNotFound        = "errors.good.notFound"
-	ErrMessageInternalServerError = "errors.internalServerError"
+	ErrMessageInternalServerError = "errors.good.internalServerError"
 )

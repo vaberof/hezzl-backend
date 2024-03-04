@@ -9,7 +9,7 @@ import (
 
 const goodLogsSubject = "good.logs"
 
-const defaultBatchSize = 2
+const defaultBatchSize = 10
 
 type Subscriber interface {
 	SubscribeOnGoodLogsSubject(goodLogStorage GoodLogStorage)

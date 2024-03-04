@@ -41,9 +41,9 @@ func (ch *ClickHouseGoodLogStorage) Insert(goodLogs []*GoodLog) error {
 
 	err = batch.Send()
 	if err != nil {
-		log.Println("failed to send a batch to clickhouse", err)
+		log.Println("Failed to send a batch to clickhouse", err)
 	} else {
-		log.Println("sent a batch to clickhouse successfully", err)
+		log.Println("Sent a batch to clickhouse successfully")
 	}
 
 	return err
