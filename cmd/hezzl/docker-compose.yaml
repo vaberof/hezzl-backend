@@ -9,6 +9,10 @@ services:
         condition: service_healthy
       redis-database:
         condition: service_started
+      clickhouse-database:
+        condition: service_healthy
+      nats:
+        condition: service_started
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=admin
@@ -39,9 +43,9 @@ services:
       postgres-database:
         condition: service_healthy
     volumes:
-      - ../../migrations:/data/db/postgres/migrations
+      - ../../migrations/postgres:/data/db/postgres/migrations/postgres
     command:
-      [ "-path", "/data/db/postgres/migrations", "-database", "postgres://postgres:admin@postgres-database:5432/hezzl_service?sslmode=disable", "up" ]
+      [ "-path", "/data/db/postgres/migrations/postgres", "-database", "postgres://postgres:admin@postgres-database:5432/hezzl_service?sslmode=disable", "up" ]
 
   # Service with redis database container
   redis-database:
@@ -51,6 +55,40 @@ services:
     ports:
       - "6379:6379"
 
+  # Service with clickhouse database container
+  clickhouse-database:
+    image: yandex/clickhouse-server
+    volumes:
+      - ./users.xml:/etc/clickhouse-server/users.d/users.xml
+      - clickhouse-database:/data/db/clickhouse
+    environment:
+      - CLICKHOUSE_DB=hezzl_service
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/?query=SELECT%201 || exit 1
+
+  # Service for managing clickhouse migrations
+  clickhouse-migrations:
+    image: migrate/migrate
+    depends_on:
+      clickhouse-database:
+        condition: service_healthy
+    volumes:
+      - ../../migrations/clickhouse:/data/db/clickhouse/migrations/clickhouse
+    command:
+      [ "-path", "/data/db/clickhouse/migrations/clickhouse", "-database", "clickhouse://clickhouse-database:9000?username=default&password=&database=hezzl_service&x-multi-statement=true", "up" ]
+
+  nats:
+    image: nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
 volumes:
   postgres-database:
   redis-database:
+  clickhouse-database:

@@ -87,7 +87,7 @@ func (h *Handler) UpdateGoodHandler() http.HandlerFunc {
 			return
 		}
 
-		payload, _ := json.Marshal(&createGoodResponseBody{
+		payload, _ := json.Marshal(&updateGoodResponseBody{
 			Id:          domainGood.Id.Int64(),
 			ProjectId:   domainGood.ProjectId.Int64(),
 			Name:        domainGood.Name.String(),

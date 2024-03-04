@@ -45,8 +45,6 @@ func NewGoodService(goodStorage GoodStorage, inMemoryStorage InMemoryStorage) Go
 }
 
 func (g *goodServiceImpl) Create(projectId domain.ProjectId, name domain.GoodName) (*Good, error) {
-	// log to clickhouse
-
 	domainGood, err := g.goodStorage.Create(projectId, name)
 	if err != nil {
 		return nil, err
@@ -56,8 +54,6 @@ func (g *goodServiceImpl) Create(projectId domain.ProjectId, name domain.GoodNam
 }
 
 func (g *goodServiceImpl) Update(id domain.GoodId, projectId domain.ProjectId, name domain.GoodName, description *domain.GoodDescription) (*Good, error) {
-	// log to clickhouse
-
 	exists, err := g.goodStorage.IsExists(id, projectId)
 	if err != nil {
 		return nil, err
@@ -84,8 +80,6 @@ func (g *goodServiceImpl) Update(id domain.GoodId, projectId domain.ProjectId, n
 }
 
 func (g *goodServiceImpl) Delete(id domain.GoodId, projectId domain.ProjectId) (*Good, error) {
-	// log to clickhouse
-
 	domainGood, err := g.goodStorage.Delete(id, projectId)
 	if err != nil {
 		if errors.Is(err, storage.ErrPostgresGoodNotFound) {
@@ -107,8 +101,6 @@ func (g *goodServiceImpl) Delete(id domain.GoodId, projectId domain.ProjectId) (
 }
 
 func (g *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
-	// log to clickhouse
-
 	goodListCacheKey := g.getGoodListCacheKey(limit, offset)
 
 	cachedDomainGoods, err := g.getCachedGoods(goodListCacheKey)
@@ -140,8 +132,6 @@ func (g *goodServiceImpl) List(limit, offset int) ([]*Good, error) {
 }
 
 func (g *goodServiceImpl) ChangePriority(id domain.GoodId, projectId domain.ProjectId, newPriority domain.GoodPriority) ([]*Good, error) {
-	// log to clickhouse
-
 	exists, err := g.goodStorage.IsExists(id, projectId)
 	if err != nil {
 		return nil, err

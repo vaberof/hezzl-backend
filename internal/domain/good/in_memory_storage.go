@@ -7,5 +7,5 @@ import (
 type InMemoryStorage interface {
 	Set(key, value string, exp time.Duration) error
 	Get(key string) (string, error)
-	Delete(key ...string) error
+	Delete(keys ...string) error
 }

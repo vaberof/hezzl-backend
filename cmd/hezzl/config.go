@@ -2,7 +2,10 @@ package main
 
 import (
 	"errors"
+	"github.com/vaberof/hezzl-backend/internal/infra/messagebroker/nats/publisher"
+	"github.com/vaberof/hezzl-backend/internal/infra/messagebroker/nats/subscriber"
 	"github.com/vaberof/hezzl-backend/pkg/config"
+	"github.com/vaberof/hezzl-backend/pkg/database/clickhouse"
 	"github.com/vaberof/hezzl-backend/pkg/database/postgres"
 	"github.com/vaberof/hezzl-backend/pkg/database/redis"
 	"github.com/vaberof/hezzl-backend/pkg/http/httpserver"
@@ -10,9 +13,12 @@ import (
 )
 
 type AppConfig struct {
-	Server   httpserver.ServerConfig
-	Postgres postgres.Config
-	Redis    redis.Config
+	Server         httpserver.ServerConfig
+	Postgres       postgres.Config
+	Redis          redis.Config
+	ClickHouse     clickhouse.Config
+	NatsPublisher  publisher.Config
+	NatsSubscriber subscriber.Config
 }
 
 func mustGetAppConfig(sources ...string) AppConfig {
@@ -55,10 +61,33 @@ func tryGetAppConfig(sources ...string) (*AppConfig, error) {
 		return nil, err
 	}
 
+	var clickHouseConfig clickhouse.Config
+	err = config.ParseConfig(provider, "app.clickhouse", &clickHouseConfig)
+	if err != nil {
+		return nil, err
+	}
+	clickHouseConfig.User = os.Getenv("CLICKHOUSE_USER")
+	clickHouseConfig.Password = os.Getenv("CLICKHOUSE_PASSWORD")
+
+	var natsPublisher publisher.Config
+	err = config.ParseConfig(provider, "app.nats.publisher", &natsPublisher)
+	if err != nil {
+		return nil, err
+	}
+
+	var natsSubscriber subscriber.Config
+	err = config.ParseConfig(provider, "app.nats.subscriber", &natsSubscriber)
+	if err != nil {
+		return nil, err
+	}
+
 	appConfig := AppConfig{
-		Server:   serverConfig,
-		Postgres: postgresConfig,
-		Redis:    redisConfig,
+		Server:         serverConfig,
+		Postgres:       postgresConfig,
+		Redis:          redisConfig,
+		ClickHouse:     clickHouseConfig,
+		NatsPublisher:  natsPublisher,
+		NatsSubscriber: natsSubscriber,
 	}
 
 	return &appConfig, nil

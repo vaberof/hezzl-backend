@@ -13,3 +13,16 @@ app:
     host: redis-database
     port: 6379
     database: 0
+
+  clickhouse:
+    host: clickhouse-database
+    port: 9000
+    database: hezzl_service
+
+  nats:
+    publisher:
+      host: nats
+      port: 4222
+    subscriber:
+      host: nats
+      port: 4222

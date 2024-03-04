@@ -13,3 +13,17 @@ app:
     host: localhost
     port: 6379
     database: 0
+
+
+  clickhouse:
+    host: localhost
+    port: 9000
+    database: hezzl_service
+
+  nats:
+    publisher:
+      host: localhost
+      port: 4222
+    subscriber:
+      host: localhost
+      port: 4222

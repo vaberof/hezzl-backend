@@ -6,17 +6,20 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"github.com/vaberof/hezzl-backend/internal/domain/good"
+	"github.com/vaberof/hezzl-backend/internal/infra/messagebroker/nats/publisher"
 	"github.com/vaberof/hezzl-backend/internal/infra/storage"
 	"github.com/vaberof/hezzl-backend/pkg/domain"
 )
 
 type PgGoodStorage struct {
-	db *sqlx.DB
+	db               *sqlx.DB
+	goodLogPublisher publisher.Publisher
 }
 
-func NewPgGoodStorage(db *sqlx.DB) *PgGoodStorage {
+func NewPgGoodStorage(db *sqlx.DB, goodLogPublisher publisher.Publisher) *PgGoodStorage {
 	return &PgGoodStorage{
-		db: db,
+		db:               db,
+		goodLogPublisher: goodLogPublisher,
 	}
 }
 
@@ -48,6 +51,19 @@ func (gs *PgGoodStorage) Create(projectId domain.ProjectId, name domain.GoodName
 	); err != nil {
 		return nil, err
 	}
+
+	if err := gs.goodLogPublisher.PublishGoodLog(
+		postgresGood.Id,
+		postgresGood.ProjectId,
+		postgresGood.Name,
+		postgresGood.Description.String,
+		postgresGood.Priority,
+		postgresGood.Removed,
+		postgresGood.CreatedAt,
+	); err != nil {
+		// TODO: process error
+	}
+
 	return toDomainGood(&postgresGood), nil
 }
 
@@ -98,6 +114,18 @@ func (gs *PgGoodStorage) Update(id domain.GoodId, projectId domain.ProjectId, na
 
 	if err = tx.Commit(); err != nil {
 		return nil, err
+	}
+
+	if err = gs.goodLogPublisher.PublishGoodLog(
+		postgresGood.Id,
+		postgresGood.ProjectId,
+		postgresGood.Name,
+		postgresGood.Description.String,
+		postgresGood.Priority,
+		postgresGood.Removed,
+		postgresGood.CreatedAt,
+	); err != nil {
+		// TODO: process error
 	}
 
 	return toDomainGood(&postgresGood), nil
@@ -151,6 +179,18 @@ func (gs *PgGoodStorage) Delete(id domain.GoodId, projectId domain.ProjectId) (*
 		return nil, err
 	}
 
+	if err = gs.goodLogPublisher.PublishGoodLog(
+		postgresGood.Id,
+		postgresGood.ProjectId,
+		postgresGood.Name,
+		postgresGood.Description.String,
+		postgresGood.Priority,
+		postgresGood.Removed,
+		postgresGood.CreatedAt,
+	); err != nil {
+		// TODO: process error
+	}
+
 	return toDomainGood(&postgresGood), nil
 }
 
@@ -167,7 +207,7 @@ func (gs *PgGoodStorage) List(limit, offset int) ([]*good.Good, error) {
 			removed,
 			created_at
 		FROM goods
-		ORDER BY created_at DESC
+		ORDER BY id ASC
 		` + limitOffsetParams
 
 	rows, err := gs.db.Query(query)
@@ -255,6 +295,22 @@ func (gs *PgGoodStorage) ChangePriority(id domain.GoodId, projectId domain.Proje
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
+
+	go func() {
+		for _, postgresGood := range postgresGoods {
+			if err = gs.goodLogPublisher.PublishGoodLog(
+				postgresGood.Id,
+				postgresGood.ProjectId,
+				postgresGood.Name,
+				postgresGood.Description.String,
+				postgresGood.Priority,
+				postgresGood.Removed,
+				postgresGood.CreatedAt,
+			); err != nil {
+				// TODO: process error
+			}
+		}
+	}()
 
 	return toDomainGoods(postgresGoods), nil
 }

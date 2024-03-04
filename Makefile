@@ -17,7 +17,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=admin
 POSTGRES_DATABASE=hezzl_service
 
-DB_URL="postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)?sslmode=disable"
+POSTGRES_DB_URL="postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)?sslmode=disable"
 
 MIGRATIONS_PATH=migrations
 
@@ -52,7 +52,7 @@ run.windows:
 		-env.vars.file $(CONFIG_DIR_WINDOWS)\application.env
 
 migrate.up:
-	migrate -path $(MIGRATIONS_PATH) -database $(DB_URL) up
+	migrate -path $(MIGRATIONS_PATH) -database $(POSTGRES_DB_URL) up
 
 migrate.down:
-	migrate -path $(MIGRATIONS_PATH) -database "$(DB_URL)" down
+	migrate -path $(MIGRATIONS_PATH) -database "$(POSTGRES_DB_URL)" down
